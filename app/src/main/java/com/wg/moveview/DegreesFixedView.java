@@ -70,33 +70,33 @@ public class DegreesFixedView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        mCenterPointF.set(getWidth()/2,getHeight()/2);
+        mCenterPointF.set(getWidth() / 2, getHeight() / 2);
         mRotateRectF.set(mCenterPointF.x - dpToPx(100f), mCenterPointF.y - dpToPx(100f),
                 mCenterPointF.x + dpToPx(100f), mCenterPointF.y + dpToPx(100f));
-        // 保存画布状态
-        canvas.save();
-        mMatrix.mapRect(mRotateRectF);
-        canvas.setMatrix(mMatrix);
-        canvas.drawPoint(mCenterPointF.x, mCenterPointF.y, mPaint);
-        canvas.drawRect(mRotateRectF,mPaint);
-        // 恢复画布状态
-        canvas.restore();
 
-        RectF iconRectF = new RectF(
-                mCenterPointF.x - mIconBitmap.getWidth()/2,
-                mCenterPointF.y - mIconBitmap.getHeight()/2,
-                mCenterPointF.x + mIconBitmap.getWidth()/2,
-                mCenterPointF.y + mIconBitmap.getHeight()/2);
+        // 获取矩形的中心点坐标
+        float rectCenterX = mRotateRectF.right;
+        float rectCenterY = mRotateRectF.top;
 
-        // 设置Matrix变换
-        Matrix iconMatrix = new Matrix();
-        iconMatrix.mapRect(iconRectF);
-        iconMatrix.postTranslate(iconRectF.left, iconRectF.top);
+        // 保存当前的 Canvas 状态
+        int saveCount = canvas.save();
 
-        canvas.drawRect(iconRectF,mPaint);
+        // 应用 Matrix 变换
+        canvas.concat(mMatrix);
+
+        // 绘制旋转矩形
+        canvas.drawRect(mRotateRectF, mPaint);
+
+        // 恢复之前保存的 Canvas 状态，以便图标的位置不受影响
+        canvas.restoreToCount(saveCount);
+
+        // 将图标的位置设置为矩形的中心点，并应用矩阵变换
+        float[] iconPosition = {rectCenterX, rectCenterY};
+        mMatrix.mapPoints(iconPosition);
+
         // 绘制图标
-        canvas.drawBitmap(mIconBitmap, null, iconRectF, mPaint);
-
+        canvas.drawBitmap(mIconBitmap, iconPosition[0] - mIconBitmap.getWidth() / 2,
+                iconPosition[1] - mIconBitmap.getHeight() / 2, mPaint);
 
     }
 
