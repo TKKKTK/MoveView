@@ -25,8 +25,12 @@ public class DegreesFixedView extends View {
     private SparseArray<PointF> mCurrPointFs;
 
     private float mDegrees = 0f;
+    private float mMinScale = 0.5f; // 最小缩放比例
+    private float mMaxScale = 2.0f; // 最大缩放比例
+    private float mScaleFactor = 1.0f; // 当前缩放比例
 
     private Bitmap mIconBitmap;
+    private boolean isUp = true;
 
     public DegreesFixedView(Context context) {
         this(context,null);
@@ -81,11 +85,17 @@ public class DegreesFixedView extends View {
         // 保存当前的 Canvas 状态
         int saveCount = canvas.save();
 
+        //mMatrix.postTranslate(-(rectCenterX - mCenterPointF.x),-(rectCenterY - mCenterPointF.y));
+
         // 应用 Matrix 变换
         canvas.concat(mMatrix);
 
+        //绘制中心点
+        canvas.drawPoint(mCenterPointF.x,mCenterPointF.y,mPaint);
+
         // 绘制旋转矩形
         canvas.drawRect(mRotateRectF, mPaint);
+
 
         // 恢复之前保存的 Canvas 状态，以便图标的位置不受影响
         canvas.restoreToCount(saveCount);
@@ -94,25 +104,28 @@ public class DegreesFixedView extends View {
         float[] iconPosition = {rectCenterX, rectCenterY};
         mMatrix.mapPoints(iconPosition);
 
+
         // 绘制图标
         canvas.drawBitmap(mIconBitmap, iconPosition[0] - mIconBitmap.getWidth() / 2,
                 iconPosition[1] - mIconBitmap.getHeight() / 2, mPaint);
-
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        switch (event.getAction()){
+        switch (event.getActionMasked()){
             case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_POINTER_DOWN:
                 int pointerIndex = event.getActionIndex();
                 int id = event.getPointerId(pointerIndex);
 
                 PointF last = new PointF(event.getX(pointerIndex), event.getY(pointerIndex));
                 mPrevPointFs.put(id, last);
-                break;
-            case MotionEvent.ACTION_POINTER_DOWN:
+                isUp = false;
                 break;
             case MotionEvent.ACTION_MOVE:
+                if (isUp){
+                    break;
+                }
                 if (event.getPointerCount() >= 2){
                     PointF mCurrPoint1 = new PointF();
                     PointF mCurrPoint2 = new PointF();
@@ -138,32 +151,33 @@ public class DegreesFixedView extends View {
                     float mCurrDistance = (float) Math.sqrt(Math.pow(mCurrDistanceX,2) + Math.pow(mCurrDistanceY,2));
 
                     mPrevPoint1.set(mPrevPointFs.get(keys[0]).x, mPrevPointFs.get(keys[0]).y);
-                    if (mPrevPointFs.get(keys[1]) != null) {
-                        mPrevPoint2.set(mPrevPointFs.get(keys[1]).x, mPrevPointFs.get(keys[1]).y);
-                    }
+                    mPrevPoint2.set(mPrevPointFs.get(keys[1]).x, mPrevPointFs.get(keys[1]).y);
 
                     float mPrevDistanceX = mPrevPoint2.x - mPrevPoint1.x;
                     float mPrevDistanceY = mPrevPoint2.y - mPrevPoint1.y;
 
                     float mPrevDistance = (float) Math.sqrt(Math.pow(mPrevDistanceX,2) + Math.pow(mPrevDistanceY,2));
 
-//                    boolean isScale = false;
-                    if (mCurrDistance != mPrevDistance && Math.abs(mCurrDistance - mPrevDistance) >= 10f){
+                    boolean isScale = false;
+                    if (Math.abs(mCurrDistance - mPrevDistance) >= 10f){
                         float scaleValue = mCurrDistance/mPrevDistance;
-                        mMatrix.postScale(scaleValue,scaleValue, mCenterPointF.x, mCenterPointF.y);
-//                        isScale = true;
+                        float newScaleFactor = mScaleFactor * scaleValue;
+                        if (newScaleFactor >= mMinScale && newScaleFactor <= mMaxScale) {
+                            mMatrix.postScale(scaleValue, scaleValue, mCenterPointF.x, mCenterPointF.y);
+                            mScaleFactor = newScaleFactor;
+                            isScale = true;
+                        }
                     }
 
-                    //计算偏差的角度
-                    double diffRadians = Math.atan2(mPrevDistanceY, mPrevDistanceX) - Math.atan2(mCurrDistanceY, mCurrDistanceX);
-                    float degrees = (float) (diffRadians * 180 / Math.PI);
+                    if (!isScale){
+                        //计算偏差的角度
+                        double diffRadians = Math.atan2(mPrevDistanceY, mPrevDistanceX) - Math.atan2(mCurrDistanceY, mCurrDistanceX);
+                        float degrees = (float) (diffRadians * 180 / Math.PI);
 
-                    if (Math.abs(mDegrees - degrees) >= 0.1f && Math.abs(degrees) <= 120f){
-                        mMatrix.postRotate(-degrees * 0.3f, mCenterPointF.x, mCenterPointF.y);
-
-                        mDegrees = degrees;
+                        if (Math.abs(degrees) >= 0.05f && Math.abs(degrees) <= 120f){
+                            mMatrix.postRotate(-degrees * 0.6f, mCenterPointF.x, mCenterPointF.y);
+                        }
                     }
-
                     for (int i = 0; i < mCurrPointFs.size(); i++) {
                         int key = mCurrPointFs.keyAt(i);
                         mPrevPointFs.put(key,mCurrPointFs.get(key));
@@ -171,18 +185,12 @@ public class DegreesFixedView extends View {
                 }
                 break;
             case MotionEvent.ACTION_UP:
-                mPrevPointFs.clear();
-                mCurrPointFs.clear();
+                 isUp = true;
                 break;
             case MotionEvent.ACTION_POINTER_UP:
-//                pointerIndex = event.getActionIndex();
-//                id = event.getPointerId(pointerIndex);
-//                mPrevPointFs.remove(id);
-//                mCurrPointFs.remove(id);
+                isUp = true;
                 break;
         }
-
-
         invalidate();
         return true;
     }
